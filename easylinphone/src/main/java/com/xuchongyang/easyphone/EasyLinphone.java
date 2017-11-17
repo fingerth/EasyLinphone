@@ -12,6 +12,7 @@ import com.xuchongyang.easyphone.linphone.LinphoneUtils;
 import com.xuchongyang.easyphone.linphone.PhoneBean;
 import com.xuchongyang.easyphone.service.LinphoneService;
 
+import org.linphone.core.LinphoneCall;
 import org.linphone.core.LinphoneCallParams;
 import org.linphone.core.LinphoneCore;
 import org.linphone.core.LinphoneCoreException;
@@ -28,7 +29,9 @@ public class EasyLinphone {
     private static ServiceWaitThread mServiceWaitThread;
     private static String mUsername, mPassword, mServerIP;
     private static AndroidVideoWindowImpl mAndroidVideoWindow;
-    private static SurfaceView mRenderingView, mPreviewView;
+    private static SurfaceView mRenderingView;
+    private static SurfaceView mPreviewView;
+    private static LinphoneCore mLinphoneCore;
 
     /**
      * 开启服务
@@ -71,7 +74,7 @@ public class EasyLinphone {
     }
 
     /**
-     * 登录到 SIP 服务器
+     * 登录
      */
     public static void login() {
         new Thread(new Runnable() {
@@ -90,12 +93,26 @@ public class EasyLinphone {
     }
 
     /**
+     * 登录 SIP 服务器
+     */
+    private static void loginToServer() {
+        try {
+            if (mUsername == null || mPassword == null || mServerIP == null) {
+                throw new RuntimeException("The sip account is not configured.");
+            }
+            LinphoneUtils.getInstance().registerUserAuth(mUsername, mPassword, mServerIP);
+        } catch (LinphoneCoreException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
      * 呼叫指定号码
      * @param num 呼叫号码
      */
     public static void callTo(String num, boolean isVideoCall) {
-        if (!LinphoneService.isReady() || !LinphoneManager.isInstanceiated()) {
-            return;
+        if (!LinphoneService.isReady() || !LinphoneManager.isInstantiated()) {
+            throw new RuntimeException("LinphoneService is not ready or the LinphoneManager is not instantiated");
         }
         if (!num.equals("")) {
             PhoneBean phone = new PhoneBean();
@@ -121,6 +138,28 @@ public class EasyLinphone {
      */
     public static void hangUp() {
         LinphoneUtils.getInstance().hangUp();
+    }
+
+    /**
+     * 暂停通话
+     */
+    public static void pauseCall() {
+        mLinphoneCore = LinphoneManager.getLcIfManagerNotDestroyOrNull();
+        if (mLinphoneCore != null) {
+            LinphoneCall linphoneCall = mLinphoneCore.getCurrentCall();
+            mLinphoneCore.pauseCall(linphoneCall);
+        }
+    }
+
+    /**
+     * 恢复通话
+     */
+    public static void resumeCall() {
+        mLinphoneCore = LinphoneManager.getLcIfManagerNotDestroyOrNull();
+        if (mLinphoneCore != null) {
+            LinphoneCall linphoneCall = mLinphoneCore.getCurrentCall();
+            mLinphoneCore.resumeCall(linphoneCall);
+        }
     }
 
     /**
@@ -165,19 +204,9 @@ public class EasyLinphone {
     }
 
     /**
-     * 登录 SIP 服务器
+     * 判断当前通话为视频通话还是语音通话
+     * @return 是否为视频通话
      */
-    private static void loginToServer() {
-        try {
-            if (mUsername == null || mPassword == null || mServerIP == null) {
-                throw new RuntimeException("The sip account is not configured.");
-            }
-            LinphoneUtils.getInstance().registerUserAuth(mUsername, mPassword, mServerIP);
-        } catch (LinphoneCoreException e) {
-            e.printStackTrace();
-        }
-    }
-
     public static boolean getVideoEnabled() {
         LinphoneCallParams remoteParams = LinphoneManager.getLc().getCurrentCall().getRemoteParams();
         return remoteParams != null && remoteParams.getVideoEnabled();
@@ -218,9 +247,9 @@ public class EasyLinphone {
     }
 
     /**
-     * onResume
+     * onVideoResume
      */
-    public static void onResume() {
+    public static void onVideoResume() {
         if (mRenderingView != null) {
             ((GLSurfaceView) mRenderingView).onResume();
         }
@@ -233,9 +262,9 @@ public class EasyLinphone {
     }
 
     /**
-     * onPause
+     * onVideoPause
      */
-    public static void onPause() {
+    public static void onVideoPause() {
         if (mAndroidVideoWindow != null) {
             synchronized (mAndroidVideoWindow) {
                 LinphoneManager.getLc().setVideoWindow(null);
@@ -248,9 +277,9 @@ public class EasyLinphone {
     }
 
     /**
-     * onDestroy
+     * onVideoDestroy
      */
-    public static void onDestroy() {
+    public static void onVideoDestroy() {
         mPreviewView = null;
         mRenderingView = null;
 

@@ -35,13 +35,13 @@ public class VideoActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        EasyLinphone.onResume();
+        EasyLinphone.onVideoResume();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        EasyLinphone.onPause();
+        EasyLinphone.onVideoPause();
     }
 
     @Override
@@ -50,7 +50,7 @@ public class VideoActivity extends AppCompatActivity {
         if (mReceiver != null) {
             unregisterReceiver(mReceiver);
         }
-        EasyLinphone.onDestroy();
+        EasyLinphone.onVideoDestroy();
     }
 
     @OnClick(R.id.video_hang)

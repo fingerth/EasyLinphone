@@ -44,71 +44,85 @@ import java.nio.ByteBuffer;
 public class LinphoneService extends Service implements LinphoneCoreListener {
     private static final String TAG = "LinphoneService";
     private PendingIntent mKeepAlivePendingIntent;
-    private static LinphoneService instance;
+    private static LinphoneService sInstance;
     private static PhoneCallback sPhoneCallback;
     private static RegistrationCallback sRegistrationCallback;
-//    private PowerManager.WakeLock mWakeLock;
 
+    @Override
+    public IBinder onBind(Intent intent) {
+        return null;
+    }
+
+    /**
+     * LinphoneService 是否启动完毕
+     * @return 是否启动完毕
+     */
     public static boolean isReady() {
-        return instance != null;
+        return sInstance != null;
     }
 
     @Override
     public void onCreate() {
         super.onCreate();
         LinphoneCoreFactoryImpl.instance();
-        LinphoneManager.createAndStart(LinphoneService.this);
-        instance = this;
+        LinphoneManager.init(LinphoneService.this);
+        sInstance = this;
+        // 每隔一分钟刷新注册状态
         Intent intent = new Intent(this, KeepAliveHandler.class);
         mKeepAlivePendingIntent = PendingIntent.getBroadcast(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
         ((AlarmManager)this.getSystemService(Context.ALARM_SERVICE)).setRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,
                 SystemClock.elapsedRealtime() + 60000, 60000, mKeepAlivePendingIntent);
-
-//        PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
-//        mWakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Linphone");
-//        mWakeLock.acquire();
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
-        Log.e(TAG, "LinphoneService onDestroy execute");
         removeAllCallback();
         LinphoneManager.getLc().destroy();
         LinphoneManager.destroy();
-//        if (mWakeLock != null) {
-//            mWakeLock.release();
-//            mWakeLock = null;
-//        }
-        ((AlarmManager)this.getSystemService(Context.ALARM_SERVICE)).cancel(mKeepAlivePendingIntent);
+        AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+        if (alarmManager != null) {
+            alarmManager.cancel(mKeepAlivePendingIntent);
+        }
     }
 
-    @Nullable
-    @Override
-    public IBinder onBind(Intent intent) {
-        return null;
-    }
-
+    /**
+     * 添加通话状态回调
+     * @param phoneCallback phoneCallback
+     */
     public static void addPhoneCallback(PhoneCallback phoneCallback) {
         sPhoneCallback = phoneCallback;
     }
 
+    /**
+     * 移除通话状态回调
+     */
     public static void removePhoneCallback() {
         if (sPhoneCallback != null) {
             sPhoneCallback = null;
         }
     }
 
+    /**
+     * 添加注册状态回调
+     * @param registrationCallback registrationCallback
+     */
     public static void addRegistrationCallback(RegistrationCallback registrationCallback) {
         sRegistrationCallback = registrationCallback;
     }
 
+    /**
+     * 移除注册状态回调
+     */
     public static void removeRegistrationCallback() {
         if (sRegistrationCallback != null) {
             sRegistrationCallback = null;
         }
     }
 
+    /**
+     * 移除所有回调
+     */
     public void removeAllCallback() {
         removePhoneCallback();
         removeRegistrationCallback();
@@ -133,7 +147,6 @@ public class LinphoneService extends Service implements LinphoneCoreListener {
 
     @Override
     public void callState(final LinphoneCore linphoneCore, final LinphoneCall linphoneCall, LinphoneCall.State state, String s) {
-        Log.e(TAG, "callState: " + state.toString());
         if (state == LinphoneCall.State.IncomingReceived && sPhoneCallback != null) {
             sPhoneCallback.incomingCall(linphoneCall);
         }
@@ -157,34 +170,6 @@ public class LinphoneService extends Service implements LinphoneCoreListener {
         if (state == LinphoneCall.State.CallReleased && sPhoneCallback != null) {
             sPhoneCallback.callReleased();
         }
-    }
-
-    /**
-     * 呼叫指定频道
-     * @param channel 频道
-     */
-    private void callThroughMobile(String channel) {
-//        mChannel = channel;
-//        if (LinphoneManager.getLc().isIncall()) {
-//            LinphoneUtils.getInstance().hangUp();
-//            MediaUtils.stop();
-//        }
-//        SPUtils.save(this, "channel", mChannel);
-//        callNowChannel();
-    }
-
-    /**
-     * 呼叫当前所在频道
-     */
-    private void callNowChannel() {
-//        if (!LinphoneManager.getLc().isIncall()) {
-//            if (!mChannel.equals("")) {
-//                PhoneBean phone = new PhoneBean();
-//                phone.setUserName(mChannel);
-//                phone.setHost("115.159.84.73");
-//                LinphoneUtils.getInstance().startSingleCallingTo(phone);
-//            }
-//        }
     }
 
     @Override

@@ -42,7 +42,7 @@ import java.util.TimerTask;
 
 public class LinphoneManager implements LinphoneCoreListener {
     private static final String TAG = "LinphoneManager";
-    private static LinphoneManager instance;
+    private static LinphoneManager sInstance;
     private Context mServiceContext;
     private LinphoneCore mLc;
     private Timer mTimer;
@@ -58,7 +58,23 @@ public class LinphoneManager implements LinphoneCoreListener {
     private String mChatDatabaseFile = null;
 //    private String mErrorToneFile = null;
 
-    public LinphoneManager(Context serviceContext) {
+    /**
+     * LinphoneManager 初始化
+     * @param context Context
+     */
+    public synchronized static void init(Context context) {
+        if (sInstance != null) {
+            throw new RuntimeException("Linphone Manager is already initialized");
+        }
+        sInstance = new LinphoneManager(context);
+        sInstance.startLibLinphone(context);
+    }
+
+    /**
+     * 构造方法
+     * @param serviceContext Context
+     */
+    private LinphoneManager(Context serviceContext) {
         mServiceContext = serviceContext;
         LinphoneCoreFactory.instance().setDebugMode(true, "huanyutong");
         sExited = false;
@@ -75,42 +91,10 @@ public class LinphoneManager implements LinphoneCoreListener {
 //        mErrorToneFile = basePath + "/error.wav";
     }
 
-    public synchronized static final LinphoneManager createAndStart(Context context) {
-        if (instance != null) {
-            throw new RuntimeException("Linphone Manager is already initialized");
-        }
-        instance = new LinphoneManager(context);
-        instance.startLibLinphone(context);
-        return instance;
-    }
-
-    public static synchronized LinphoneCore getLcIfManagerNotDestroyOrNull() {
-        if (sExited || instance == null) {
-            Log.e("Trying to get linphone core while LinphoneManager already destroyed or not created");
-            return null;
-        }
-        return getLc();
-    }
-
-    public static final boolean isInstanceiated() {
-        return instance != null;
-    }
-
-    public static synchronized final LinphoneCore getLc() {
-        return getInstance().mLc;
-    }
-
-    public static synchronized final LinphoneManager getInstance() {
-        if (instance != null) {
-            return instance;
-        }
-        if (sExited) {
-            throw new RuntimeException("Linphone Manager was already destroyed. "
-                    + "Better use getLcIfManagerNotDestroyed and check returned value");
-        }
-        throw new RuntimeException("Linphone Manager should be created before accessed");
-    }
-
+    /**
+     * 初始化 LinphoneCore
+     * @param context Context
+     */
     private synchronized void startLibLinphone(Context context) {
         try {
             copyAssetsFromPackage();
@@ -121,7 +105,7 @@ public class LinphoneManager implements LinphoneCoreListener {
             try {
                 initLibLinphone();
             } catch (LinphoneCoreException e) {
-                Log.e(e);
+                e.printStackTrace();
             }
 
             TimerTask task = new TimerTask() {
@@ -145,6 +129,10 @@ public class LinphoneManager implements LinphoneCoreListener {
         }
     }
 
+    /**
+     * 初始化 LibLinphone
+     * @throws LinphoneCoreException LinphoneCoreException
+     */
     private synchronized void initLibLinphone() throws LinphoneCoreException {
         mLc.setContext(mServiceContext);
         setUserAgent();
@@ -176,7 +164,7 @@ public class LinphoneManager implements LinphoneCoreListener {
         mLc.enableAdaptiveRateControl(true);
 
         //audio 码率设置
-        LinphoneUtils.getConfig(mServiceContext).setInt("audio", "codec_bitrate_limit", 36);
+        LinphoneUtils.getConfig(mServiceContext).setInt("audio", "codec_bitrate_limit", 128);
 
         mLc.setPreferredVideoSizeByName("720p");
         mLc.setUploadBandwidth(1536);
@@ -188,12 +176,54 @@ public class LinphoneManager implements LinphoneCoreListener {
 
         // 设置编码格式
         setCodecMime();
-
-//        IntentFilter filter = new IntentFilter(Intent.ACTION_SCREEN_ON);
-//        filter.addAction(Intent.ACTION_SCREEN_OFF);
-//        mServiceContext.registerReceiver(mKeepAliveReceiver, filter);
     }
 
+    /**
+     * 获取 LinphoneCore 实例
+     * @return LinphoneCore 实例
+     */
+    public static synchronized LinphoneCore getLcIfManagerNotDestroyOrNull() {
+        if (sExited || sInstance == null) {
+            Log.e("Trying to get linphone core while LinphoneManager already destroyed or not created");
+            return null;
+        }
+        return getLc();
+    }
+
+    /**
+     * 获取 LinphoneCore 实例
+     * @return LinphoneCore 实例
+     */
+    public static synchronized final LinphoneCore getLc() {
+        return getInstance().mLc;
+    }
+
+    /**
+     * LinphoneManager 是否初始化
+     * @return 是否初始化
+     */
+    public static final boolean isInstantiated() {
+        return sInstance != null;
+    }
+
+    /**
+     * 获取 LinphoneManager 实例
+     * @return LinphoneManager 实例
+     */
+    public static synchronized final LinphoneManager getInstance() {
+        if (sInstance != null) {
+            return sInstance;
+        }
+        if (sExited) {
+            throw new RuntimeException("Linphone Manager was already destroyed. "
+                    + "Better use getLcIfManagerNotDestroyed and check returned value");
+        }
+        throw new RuntimeException("Linphone Manager should be created before accessed");
+    }
+
+    /**
+     * 设置编码格式
+     */
     private void setCodecMime() {
         for (PayloadType payloadType : mLc.getAudioCodecs()) {
             try {
@@ -201,21 +231,6 @@ public class LinphoneManager implements LinphoneCoreListener {
             } catch (LinphoneCoreException e) {
                 e.printStackTrace();
             }
-//            android.util.Log.e(TAG, "setCodecMime = " + payloadType.getMime() + " Rate " + payloadType.getRate() + " receviceFmtp " + payloadType.getRecvFmtp());
-//            if (payloadType.getMime().equals("PCMA") && payloadType.getRate() == 8000) {
-//                try {
-//                    android.util.Log.e(TAG, "setCodecMime: " + payloadType.getMime() + " " + payloadType.getRate());
-//                    mLc.enablePayloadType(payloadType, true);
-//                } catch (LinphoneCoreException e) {
-//                    android.util.Log.e(TAG, "setCodecMime: " + e);
-//                }
-//            } else {
-//                try {
-//                    mLc.enablePayloadType(payloadType, false);
-//                } catch (LinphoneCoreException e) {
-//                    e.printStackTrace();
-//                }
-//            }
         }
         for (PayloadType payloadType : mLc.getVideoCodecs()) {
             try {
@@ -227,6 +242,10 @@ public class LinphoneManager implements LinphoneCoreListener {
         }
     }
 
+    /**
+     * 从 assets 中导入资源文件
+     * @throws IOException exception
+     */
     private void copyAssetsFromPackage() throws IOException {
         LinphoneUtils.copyIfNotExist(mServiceContext, R.raw.oldphone_mono, mRingSoundFile);
         LinphoneUtils.copyIfNotExist(mServiceContext, R.raw.ringback, mRingBackSoundFile);
@@ -237,6 +256,9 @@ public class LinphoneManager implements LinphoneCoreListener {
         LinphoneUtils.copyIfNotExist(mServiceContext, R.raw.rootca, mLinphoneRootCaFile);
     }
 
+    /**
+     * 打印调试信息
+     */
     private void setUserAgent() {
         try {
             String versionName = mServiceContext.getPackageManager().getPackageInfo(mServiceContext.getPackageName(),
@@ -244,20 +266,26 @@ public class LinphoneManager implements LinphoneCoreListener {
             if (versionName == null) {
                 versionName = String.valueOf(mServiceContext.getPackageManager().getPackageInfo(mServiceContext.getPackageName(), 0).versionCode);
             }
-            mLc.setUserAgent("Hunayutong", versionName);
+            mLc.setUserAgent("Huanyutong", versionName);
         } catch (PackageManager.NameNotFoundException e) {
             e.printStackTrace();
         }
     }
 
+    /**
+     * 销毁 LinphoneManager
+     */
     public static synchronized void destroy() {
-        if (instance == null) {
+        if (sInstance == null) {
             return;
         }
         sExited = true;
-        instance.doDestroy();
+        sInstance.doDestroy();
     }
 
+    /**
+     * 执行销毁动作
+     */
     private void doDestroy() {
         try {
             mTimer.cancel();
@@ -266,7 +294,7 @@ public class LinphoneManager implements LinphoneCoreListener {
             e.printStackTrace();
         } finally {
             mLc = null;
-            instance = null;
+            sInstance = null;
         }
     }
 
@@ -435,6 +463,9 @@ public class LinphoneManager implements LinphoneCoreListener {
 
     }
 
+    /**
+     * 设置默认摄像头
+     */
     private void setBackCamAsDefault() {
 //        int camId = 0;
 //        AndroidCameraConfiguration.AndroidCamera[] cameras = AndroidCameraConfiguration.retrieveCameras();

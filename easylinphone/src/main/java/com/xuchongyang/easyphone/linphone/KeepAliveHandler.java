@@ -17,7 +17,6 @@ public class KeepAliveHandler extends BroadcastReceiver {
     public void onReceive(Context context, Intent intent) {
         if (LinphoneManager.getLcIfManagerNotDestroyOrNull() != null) {
             LinphoneManager.getLc().refreshRegisters();
-//            SPUtils.save(context, "keepAlive", true);
             try {
                 Thread.sleep(2000);
             } catch (InterruptedException e) {
